@@ -5,12 +5,18 @@ import logging
 from typing import override
 
 from homeassistant.components import ai_task, conversation
-from homeassistant.config_entries import ConfigEntry
+
+# 移除旧的普通 ConfigEntry 导入
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util.json import json_loads
 
+# --- 补充修改点 ---
+# 导入我们自定义带有 RAG 包装盒的 OllamaConfigEntry 类型
+from . import OllamaConfigEntry
+
+# -----------------
 from .entity import OllamaBaseLLMEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -18,7 +24,7 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: OllamaConfigEntry,  # 修改：使用严格类型的 OllamaConfigEntry
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up AI Task entities."""

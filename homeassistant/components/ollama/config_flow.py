@@ -260,7 +260,10 @@ class OllamaSubentryFlowHandler(ConfigSubentryFlow):
     def _client(self) -> ollama.AsyncClient:
         """Return the Ollama client."""
         entry: OllamaConfigEntry = self._get_entry()
-        return entry.runtime_data
+        # --- 修改部分 ---
+        # 提取 OllamaRuntimeData 数据容器中的 client 属性
+        return entry.runtime_data.client
+        # --------------
 
     async def async_step_set_options(
         self, user_input: dict[str, Any] | None = None

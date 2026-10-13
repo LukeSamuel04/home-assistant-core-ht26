@@ -1,6 +1,7 @@
 """The Ollama integration."""
 
 import asyncio
+from dataclasses import dataclass  # 新增：用于创建数据容器
 import logging
 from types import MappingProxyType
 
@@ -40,6 +41,11 @@ from .const import (
     DOMAIN,
 )
 
+# 新增：导入我们的 RAG 核心组件
+from .rag_database.embedding import OllamaEmbeddingEngine
+from .rag_database.retriever import RAGRetriever
+from .rag_database.storage import SQLiteStorage
+
 _LOGGER = logging.getLogger(__name__)
 
 __all__ = [
@@ -56,7 +62,18 @@ __all__ = [
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS = (Platform.AI_TASK, Platform.CONVERSATION)
 
-type OllamaConfigEntry = ConfigEntry[ollama.AsyncClient]
+
+# 新增：定义新的运行时数据容器，打包官方 client 和我们的 retriever
+@dataclass
+class OllamaRuntimeData:
+    """Ollama integration runtime data."""
+
+    client: ollama.AsyncClient
+    retriever: RAGRetriever
+
+
+# 修改：将原本的 ConfigEntry[ollama.AsyncClient] 替换为新的数据容器
+type OllamaConfigEntry = ConfigEntry[OllamaRuntimeData]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -96,7 +113,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: OllamaConfigEntry) -> bo
     except (TimeoutError, httpx.ConnectError, ConnectionError) as err:
         raise ConfigEntryNotReady(err) from err
 
-    entry.runtime_data = client
+    # --- 核心挂载逻辑 ---
+    # 1. 动态获取 HA 的 config 文件夹路径
+    db_path = hass.config.path("ollama_rag_memory.db")
+
+    # 2. 实例化数据库存储
+    storage = SQLiteStorage(db_path)
+
+    # 3. 实例化向量引擎（直接使用系统配置的 Ollama URL，动态适应）
+    embedding_engine = OllamaEmbeddingEngine(host=settings[CONF_URL])
+
+    # 4. 实例化检索器
+    retriever = RAGRetriever(storage, embedding_engine)
+
+    # 5. 将官方 client 和 retriever 一起装进 runtime_data 容器
+    entry.runtime_data = OllamaRuntimeData(client=client, retriever=retriever)
+    # --------------------
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     entry.async_on_unload(entry.add_update_listener(async_update_options))
