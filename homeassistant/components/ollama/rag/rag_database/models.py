@@ -9,6 +9,7 @@ import numpy as np
 @dataclass
 class MemoryItem:
     content: str
+    user_id: str  # 新增：必须提供 user_id 才能创建记忆
     category: str = "home_assistant"
     tier: str = "hot"
     id: Optional[int] = None

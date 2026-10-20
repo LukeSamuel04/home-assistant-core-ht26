@@ -14,9 +14,12 @@ class RAGRetriever:
         self.storage = storage
         self.embedding = embedding_engine
 
-    async def async_search(self, query: str, top_k: int = 3) -> list[MemoryItem]:
+    async def async_search(
+        self, query: str, user_id: str, top_k: int = 3
+    ) -> list[MemoryItem]:
         query_vector = await self.embedding.generate_embedding(query)
-        rows = await asyncio.to_thread(self.storage.fetch_all)
+        # 核心修改：只拉取属于当前用户的记忆
+        rows = await asyncio.to_thread(self.storage.fetch_by_user, user_id)
 
         if not rows:
             return []
@@ -25,11 +28,14 @@ class RAGRetriever:
         db_vectors = []
 
         for row in rows:
-            row_id, content, category, tier, embedding_blob, created_at = row
+            row_id, row_user_id, content, category, tier, embedding_blob, created_at = (
+                row
+            )
             vec = np.frombuffer(embedding_blob, dtype=np.float32)
             db_vectors.append(vec)
             item = MemoryItem(
                 id=row_id,
+                user_id=row_user_id,
                 content=content,
                 category=category,
                 tier=tier,

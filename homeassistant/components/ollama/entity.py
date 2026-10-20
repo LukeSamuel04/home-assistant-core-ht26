@@ -207,11 +207,8 @@ class OllamaBaseLLMEntity(Entity):
         """Generate an answer for the chat log."""
         settings = {**self.entry.data, **self.subentry.data}
 
-        # --- 拆包修改点 1 ---
-        # 获取官方客户端和我们自己挂载的检索器
-        client = self.entry.runtime_data.client
-        retriever = self.entry.runtime_data.retriever
-        # -------------------
+        # 仅保留纯粹的客户端获取，删除了越界的 retriever 获取
+        client = self.entry.runtime_data
 
         model = settings[CONF_MODEL]
 
@@ -228,41 +225,7 @@ class OllamaBaseLLMEntity(Entity):
         max_messages = int(settings.get(CONF_MAX_HISTORY, DEFAULT_MAX_HISTORY))
         self._trim_history(message_history, max_messages)
 
-        # ==================== 核心 RAG 注入逻辑开始 ====================
-        latest_query = ""
-        # 1. 倒序遍历对话历史，找到用户刚刚发出的最后一条问题
-        for msg in reversed(message_history.messages):
-            if msg.role == MessageRole.USER.value and isinstance(msg.content, str):
-                latest_query = msg.content
-                break
-
-        if latest_query:
-            try:
-                # 2. 调用本地向量引擎，检索最相关的 Top 3 条规则（耗时极短）
-                rag_results = await retriever.async_search(latest_query, top_k=3)
-
-                if rag_results:
-                    # 3. 组装提示词
-                    context_str = "【内部系统提示：在回答用户时，请严格参考并遵循以下最新的家庭状态与规则】\n"
-                    for i, item in enumerate(rag_results, 1):
-                        context_str += f"{i}. {item.content}\n"
-
-                    # 4. 创建一条隐藏的 SYSTEM 消息
-                    rag_msg = ollama.Message(
-                        role=MessageRole.SYSTEM.value, content=context_str
-                    )
-
-                    # 5. 巧妙插入：找到最新那条用户消息的位置，把 RAG 规则紧贴着插在它前面，
-                    # 这样大模型的注意力机制（Attention）会给予这条规则极高的权重
-                    for i in range(len(message_history.messages) - 1, -1, -1):
-                        if message_history.messages[i].role == MessageRole.USER.value:
-                            message_history.messages.insert(i, rag_msg)
-                            break
-            except Exception as e:
-                _LOGGER.error(
-                    "RAG Retrieval Failed, falling back to standard LLM chat: %s", e
-                )
-        # ==================== 核心 RAG 注入逻辑结束 ====================
+        # 此处删除了全部庞杂的 RAG 注入逻辑，交由上一层 conversation.py 和 HA 原生调度处理
 
         output_format: dict[str, Any] | None = None
         if structure:
@@ -329,7 +292,7 @@ class OllamaBaseLLMEntity(Entity):
         up in the context window.
 
         Note that some messages in the history may not be from ollama only, and
-        may come from other anents, so the assumptions here may not strictly hold,
+        may come from other agents, so the assumptions here may not strictly hold,
         but generally should be effective.
         """
         if max_messages < 1:

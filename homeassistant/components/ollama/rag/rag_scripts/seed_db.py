@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -9,14 +10,18 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-# 动态获取 HA 的根目录，并将其加入系统路径，完美解决导入报错
+# ==========================================
+# 动态获取 HA 的根目录，并将其加入系统路径
+# ==========================================
 current_dir = Path(__file__).resolve().parent
-ha_root = current_dir.parent.parent.parent.parent
+ha_root = current_dir.parent.parent.parent.parent.parent
 sys.path.insert(0, str(ha_root))
 
-from homeassistant.components.ollama.rag_database.embedding import OllamaEmbeddingEngine
-from homeassistant.components.ollama.rag_database.models import MemoryItem
-from homeassistant.components.ollama.rag_database.storage import SQLiteStorage
+from homeassistant.components.ollama.rag.rag_database.embedding import (
+    OllamaEmbeddingEngine,
+)
+from homeassistant.components.ollama.rag.rag_database.models import MemoryItem
+from homeassistant.components.ollama.rag.rag_database.storage import SQLiteStorage
 
 # 将数据库文件生成在 HA 的统一 config 文件夹中
 DB_PATH = ha_root / "config" / "ollama_rag_memory.db"
@@ -102,7 +107,14 @@ async def seed_database() -> None:
     for i, text in enumerate(MEMORY_ITEMS, start=1):
         try:
             vector = await embedding_engine.generate_embedding(text)
-            item = MemoryItem(content=text, category="smart_home_rules", tier="hot")
+
+            # 【修复点】：在这里加入你刚刚找到的真实 user_id
+            item = MemoryItem(
+                content=text,
+                user_id="b248edd617b74cb4b4a4380c719f12ec",  # <--- 修改为你的真实 HA 用户 ID
+                category="smart_home_rules",
+                tier="hot",
+            )
             inserted_id = storage.insert(item, vector)
             logger.info(
                 "[%d/%d] Inserted ID %d: %s...",
