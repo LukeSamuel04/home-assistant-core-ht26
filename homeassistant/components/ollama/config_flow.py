@@ -411,6 +411,7 @@ class OllamaConversationSubentryFlowHandler(OllamaSubentryFlowHandler):
         self._memory_ready = False
         self._memory_update: ChatMemory | None = None
         self._recalculate_task: asyncio.Task[int] | None = None
+        self._memory_errors: dict[str, str] | None = None
 
     @override
     async def async_step_set_options(
@@ -430,11 +431,14 @@ class OllamaConversationSubentryFlowHandler(OllamaSubentryFlowHandler):
     ) -> SubentryFlowResult:
         """Choose the embedding model and how many messages to remember."""
         assert self._config_data is not None
-        if user_input is None:
-            return await self._async_show_memory_form()
+        # Coming back here after a progress step passes an empty input.
+        if not user_input:
+            errors, self._memory_errors = self._memory_errors, None
+            return await self._async_show_memory_form(errors)
 
         self._embedding_model = _with_tag(user_input[CONF_EMBEDDING_MODEL])
         self._embedding_download_task = None
+        self._recalculate_task = None
         self._config_data[CONF_EMBEDDING_MODEL] = self._embedding_model
         self._config_data[CONF_MEMORY_LIMIT] = int(user_input[CONF_MEMORY_LIMIT])
         try:
@@ -533,18 +537,19 @@ class OllamaConversationSubentryFlowHandler(OllamaSubentryFlowHandler):
                 f"Downloading {self._embedding_model}",
             )
 
-        if self._embedding_download_task.done():
-            if err := self._embedding_download_task.exception():
-                _LOGGER.error("Unexpected error while downloading model: %s", err)
-                return self.async_show_progress_done(next_step_id="failed")
+        if not self._embedding_download_task.done():
+            return self.async_show_progress(
+                step_id="download_embedding",
+                progress_action="download_embedding",
+                progress_task=self._embedding_download_task,
+            )
 
-            return self.async_show_progress_done(next_step_id="check_embedding")
-
-        return self.async_show_progress(
-            step_id="download_embedding",
-            progress_action="download_embedding",
-            progress_task=self._embedding_download_task,
-        )
+        try:
+            await self._embedding_download_task
+        except Exception:
+            _LOGGER.exception("Unexpected error while downloading model")
+            return self.async_show_progress_done(next_step_id="failed")
+        return self.async_show_progress_done(next_step_id="check_embedding")
 
     async def async_step_check_embedding(
         self, user_input: dict[str, Any] | None = None
@@ -586,24 +591,22 @@ class OllamaConversationSubentryFlowHandler(OllamaSubentryFlowHandler):
                 "Updating Ollama memories",
             )
 
-        if self._recalculate_task.done():
-            if err := self._recalculate_task.exception():
-                _LOGGER.error("Could not update the saved messages: %s", err)
-                return self.async_show_progress_done(next_step_id="recalculate_failed")
+        if not self._recalculate_task.done():
+            return self.async_show_progress(
+                step_id="recalculate",
+                progress_action="recalculate",
+                progress_task=self._recalculate_task,
+            )
 
-            return self.async_show_progress_done(next_step_id="finish")
-
-        return self.async_show_progress(
-            step_id="recalculate",
-            progress_action="recalculate",
-            progress_task=self._recalculate_task,
-        )
-
-    async def async_step_recalculate_failed(
-        self, user_input: dict[str, Any] | None = None
-    ) -> SubentryFlowResult:
-        """Step after updating the saved messages has failed."""
-        return self.async_abort(reason="recalculate_failed")
+        try:
+            await self._recalculate_task
+        except Exception:
+            _LOGGER.exception("Could not update the saved messages")
+            # Back to the memory screen: nothing is saved and the user can retry.
+            self._memory_errors = {"base": "recalculate_failed"}
+            self._memory_ready = False
+            return self.async_show_progress_done(next_step_id="memory")
+        return self.async_show_progress_done(next_step_id="finish")
 
     @override
     async def async_step_finish(
