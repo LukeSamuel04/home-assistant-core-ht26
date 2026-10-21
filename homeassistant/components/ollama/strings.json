@@ -100,11 +100,11 @@
             "memory_limit": "Messages to remember per person"
           },
           "data_description": {
-            "embedding_model": "Ollama model that turns text into numbers so related messages can be found. It is downloaded if needed. Changing it updates every saved message.",
-            "memory_limit": "Older messages are forgotten automatically."
+            "embedding_model": "The Ollama model used to find related messages. It is downloaded automatically if your Ollama server doesn't have it yet. Changing it later updates all saved messages.",
+            "memory_limit": "When someone has more saved messages than this, their oldest ones are forgotten."
           },
-          "description": "The assistant saves each person's messages and its replies, and recalls the relevant ones in later chats. People only get their own memories, and voice messages are never saved.",
-          "title": "Memory"
+          "description": "The assistant remembers what each person says in the chat, together with its replies, and brings up the relevant parts in later chats. Everyone only gets their own memories, and voice messages are never saved.",
+          "title": "Long-term memory"
         },
         "recalculate": {
           "title": "Updating saved messages"

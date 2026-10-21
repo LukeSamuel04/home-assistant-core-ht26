@@ -27,6 +27,7 @@ from homeassistant.config_entries import SOURCE_USER, ConfigSubentry
 from homeassistant.const import CONF_MODEL, CONF_NAME
 from homeassistant.core import Context, HomeAssistant
 from homeassistant.data_entry_flow import FlowResult, FlowResultType
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import STORAGE_DIR
 
 from tests.common import MockConfigEntry
@@ -117,6 +118,7 @@ async def converse(
     conversation_id: str | None = None,
     satellite_id: str | None = None,
     reply: str = "Okay!",
+    agent_id: str = AGENT_ID,
 ) -> tuple[conversation.ConversationResult, str]:
     """Send a message and return the result and the system prompt the AI got."""
     with patch(
@@ -130,7 +132,7 @@ async def converse(
             text,
             conversation_id,
             Context(user_id=user_id),
-            agent_id=AGENT_ID,
+            agent_id=agent_id,
             satellite_id=satellite_id,
         )
     return result, mock_chat.call_args.kwargs["messages"][0]["content"]
@@ -217,6 +219,42 @@ async def test_memory_is_private_per_user(hass: HomeAssistant) -> None:
 
     assert MEMORY_HEADER not in prompt
     assert "Saved messages: 0 " in prompt
+
+
+@pytest.mark.usefixtures("mock_init_component")
+async def test_each_agent_has_its_own_memory(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Two conversation agents keep separate memories."""
+    first = conversation_subentry(mock_config_entry)
+    second = ConfigSubentry(
+        data={
+            CONF_MODEL: CHAT_MODEL,
+            CONF_MEMORY: True,
+            CONF_EMBEDDING_MODEL: EMBEDDING_MODEL,
+            CONF_MEMORY_LIMIT: 3,
+        },
+        subentry_type="conversation",
+        title="Second agent",
+        unique_id=None,
+    )
+    with patch("ollama.AsyncClient.list"):
+        hass.config_entries.async_add_subentry(mock_config_entry, second)
+        await hass.async_block_till_done()
+    second_agent = entity_registry.async_get_entity_id(
+        "conversation", "ollama", second.subentry_id
+    )
+
+    await converse(hass, "My favourite colour is green.")
+    _, prompt = await converse(
+        hass, "What is my favourite colour?", agent_id=second_agent
+    )
+
+    assert MEMORY_HEADER not in prompt
+    assert len(saved_rows(hass, first.subentry_id)) == 1
+    assert len(saved_rows(hass, second.subentry_id)) == 1
 
 
 @pytest.mark.usefixtures("mock_init_component")
