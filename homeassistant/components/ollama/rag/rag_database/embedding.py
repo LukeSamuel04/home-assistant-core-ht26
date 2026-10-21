@@ -1,17 +1,21 @@
-"""Async embedding engine using Ollama."""
+"""Embeddings from the Ollama server."""
+
+from collections.abc import Sequence
 
 import numpy as np
+from numpy.typing import NDArray
 from ollama import AsyncClient
 
 
 class OllamaEmbeddingEngine:
-    def __init__(
-        self, host: str = "http://localhost:11434", model: str = "nomic-embed-text"
-    ) -> None:
-        self.client = AsyncClient(host=host)
+    """Turn text into embeddings with an Ollama embedding model."""
+
+    def __init__(self, client: AsyncClient, model: str) -> None:
+        """Initialize the engine."""
+        self.client = client
         self.model = model
 
-    async def generate_embedding(self, text: str) -> np.ndarray:
-        response = await self.client.embeddings(model=self.model, prompt=text)
-        vector_data = response["embedding"]
-        return np.array(vector_data, dtype=np.float32)
+    async def async_embed(self, texts: Sequence[str]) -> list[NDArray[np.float32]]:
+        """Return one embedding per text."""
+        response = await self.client.embed(model=self.model, input=list(texts))
+        return [np.asarray(vector, dtype=np.float32) for vector in response.embeddings]

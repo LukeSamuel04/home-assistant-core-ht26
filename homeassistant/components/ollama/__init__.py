@@ -39,6 +39,7 @@ from .const import (
     DEFAULT_TIMEOUT,
     DOMAIN,
 )
+from .rag.memory import remove_orphaned_memories
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,8 +57,6 @@ __all__ = [
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS = (Platform.AI_TASK, Platform.CONVERSATION)
 
-
-# 恢复官方纯净定义：runtime_data 直接就是 AsyncClient
 type OllamaConfigEntry = ConfigEntry[ollama.AsyncClient]
 
 
@@ -98,10 +97,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: OllamaConfigEntry) -> bo
     except (TimeoutError, httpx.ConnectError, ConnectionError) as err:
         raise ConfigEntryNotReady(err) from err
 
-    # --- 极其清爽的官方挂载逻辑 ---
-    # 去除了所有的 RAG 数据库连接，只保留了纯粹的官方 Client 挂载
     entry.runtime_data = client
-    # ------------------------------
+
+    await hass.async_add_executor_job(
+        remove_orphaned_memories,
+        hass,
+        {
+            subentry_id
+            for ollama_entry in hass.config_entries.async_entries(DOMAIN)
+            for subentry_id in ollama_entry.subentries
+        },
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 

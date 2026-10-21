@@ -207,9 +207,7 @@ class OllamaBaseLLMEntity(Entity):
         """Generate an answer for the chat log."""
         settings = {**self.entry.data, **self.subentry.data}
 
-        # 仅保留纯粹的客户端获取，删除了越界的 retriever 获取
         client = self.entry.runtime_data
-
         model = settings[CONF_MODEL]
 
         tools: list[dict[str, Any]] | None = None
@@ -224,8 +222,6 @@ class OllamaBaseLLMEntity(Entity):
         )
         max_messages = int(settings.get(CONF_MAX_HISTORY, DEFAULT_MAX_HISTORY))
         self._trim_history(message_history, max_messages)
-
-        # 此处删除了全部庞杂的 RAG 注入逻辑，交由上一层 conversation.py 和 HA 原生调度处理
 
         output_format: dict[str, Any] | None = None
         if structure:

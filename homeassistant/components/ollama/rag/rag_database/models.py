@@ -1,17 +1,17 @@
-"""Data Transfer Objects for RAG vector storage."""
+"""Data objects for the Ollama chat memory."""
 
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 import numpy as np
+from numpy.typing import NDArray
 
 
-@dataclass
+@dataclass(slots=True)
 class MemoryItem:
+    """A remembered exchange from an earlier conversation."""
+
+    id: int
+    user_id: str
+    conversation_id: str
     content: str
-    user_id: str  # 新增：必须提供 user_id 才能创建记忆
-    category: str = "home_assistant"
-    tier: str = "hot"
-    id: Optional[int] = None
-    embedding: Optional[np.ndarray] = field(default=None, repr=False)
-    created_at: Optional[str] = None
+    embedding: NDArray[np.float32]

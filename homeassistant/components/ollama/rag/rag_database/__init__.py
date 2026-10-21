@@ -1,1 +1,1 @@
-"""RAG core engine package."""
+"""Storage, embeddings and search for the Ollama chat memory."""
