@@ -27,10 +27,10 @@ CONF_EMBEDDING_MODEL = "embedding_model"
 CONF_MEMORY_LIMIT = "memory_limit"
 DEFAULT_EMBEDDING_MODEL = "nomic-embed-text:latest"
 DEFAULT_MEMORY_LIMIT = 300
-MIN_MEMORY_LIMIT = 10
+MIN_MEMORY_LIMIT = 1
 MAX_MEMORY_LIMIT = 10000
 MEMORY_TOP_K = 3
-MEMORY_MIN_SCORE = 0.5
+MEMORY_MIN_SCORE = 0.6
 
 EMBEDDING_MODEL_NAMES = [  # https://ollama.com/search?c=embedding
     "all-minilm",
