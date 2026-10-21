@@ -441,7 +441,9 @@ class OllamaConversationSubentryFlowHandler(OllamaSubentryFlowHandler):
             async with asyncio.timeout(DEFAULT_TIMEOUT):
                 response = await self._client.list()
         except TimeoutError, httpx.HTTPError, ConnectionError:
-            _LOGGER.exception("Failed to get models from Ollama server")
+            _LOGGER.exception(
+                "Failed to check the embedding model on the Ollama server"
+            )
             return self.async_abort(reason="cannot_connect")
 
         if self._embedding_model not in {
@@ -458,7 +460,7 @@ class OllamaConversationSubentryFlowHandler(OllamaSubentryFlowHandler):
         try:
             models_to_list = await self._async_embedding_models()
         except TimeoutError, httpx.HTTPError, ConnectionError:
-            _LOGGER.exception("Failed to get models from Ollama server")
+            _LOGGER.exception("Failed to list embedding models on the Ollama server")
             return self.async_abort(reason="cannot_connect")
 
         return self.async_show_form(

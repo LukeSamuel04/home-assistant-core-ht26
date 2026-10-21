@@ -72,8 +72,8 @@ class ChatMemory:
         """Create the database and apply the message limit, return success."""
         try:
             await self._hass.async_add_executor_job(self._storage.setup, self._limit)
-        except sqlite3.Error as err:
-            _LOGGER.error("Could not open the memory database: %s", err)
+        except sqlite3.Error:
+            _LOGGER.exception("Could not open the memory database")
             return False
         return True
 
@@ -85,8 +85,8 @@ class ChatMemory:
             items = await self._hass.async_add_executor_job(
                 self._storage.fetch, user_id, self._model
             )
-        except sqlite3.Error as err:
-            _LOGGER.error("Could not read the memory database: %s", err)
+        except sqlite3.Error:
+            _LOGGER.exception("Could not read the memory database")
             return None
         # Skip the exchanges the AI still sees in the current chat history.
         current = [item for item in items if item.conversation_id == conversation_id]
@@ -120,8 +120,8 @@ class ChatMemory:
                 vector,
                 self._limit,
             )
-        except sqlite3.Error as err:
-            _LOGGER.error("Could not save to the memory database: %s", err)
+        except sqlite3.Error:
+            _LOGGER.exception("Could not save to the memory database")
 
     async def async_count_stale(self) -> int:
         """Return how many memories were embedded with another model."""
@@ -129,8 +129,8 @@ class ChatMemory:
             return await self._hass.async_add_executor_job(
                 self._storage.count_stale, self._model
             )
-        except sqlite3.Error as err:
-            _LOGGER.error("Could not read the memory database: %s", err)
+        except sqlite3.Error:
+            _LOGGER.exception("Could not read the memory database")
             return 0
 
     async def async_recalculate(
